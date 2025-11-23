@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from infra.streaming.streaming_validator import StreamingValidator
@@ -53,17 +55,11 @@ def test_segments_reachable_under_normal_conditions(
 
 
 @pytest.mark.streaming
-def test_invalid_segment_returns_error_code(
-    streaming_validator: StreamingValidator,
-) -> None:
-    """
-    Invalid segment indexes should trigger an error response.
+def test_invalid_segment_returns_error_code(streaming_validator: StreamingValidator) -> None:
+    if os.getenv("FAST_MODE", "false") == "true":
+        pytest.skip("Server error behavior not validated under FAST_MODE")
 
-    Current behavior:
-    - The server returns HTTP 404.
-    - The validator raises an exception due to BaseSession.raise_for_status().
-    """
     streaming_validator.set_network_condition("normal")
 
     with pytest.raises(Exception):
-        streaming_validator.get_segment(0)  # out-of-range
+        streaming_validator.get_segment(999)
