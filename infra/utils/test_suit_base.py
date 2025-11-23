@@ -2,7 +2,7 @@ import logging
 from appium import webdriver
 from appium.options.android import UiAutomator2Options
 from selenium.webdriver.support.ui import WebDriverWait
-from config.config import Config
+from config import Config
 
 PKG = "com.google.android.apps.tasks"
 ACT = "com.google.android.apps.tasks.ui.TaskListsActivity"  # adjust if resolve-activity shows different

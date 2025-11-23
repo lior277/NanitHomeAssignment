@@ -21,7 +21,7 @@ from selenium.common.exceptions import (
 )
 
 from appium.webdriver.common.appiumby import AppiumBy
-from config.config import Config
+from config import Config
 
 
 def ignore_exception_types():

@@ -9,24 +9,9 @@ NetworkCondition = Literal["normal", "poor", "terrible"]
 
 
 class StreamingValidator:
-    """
-    Helper around the mock streaming server.
-
-    Responsibilities:
-    - Read metrics from /health and /metrics
-    - Switch network conditions via /control/network/<condition>
-    - Touch manifest/segments to validate that streaming is reachable
-    """
-
-    def __init__(
-        self,
-        base_url: str = "http://localhost:8082",
-        session: Optional[requests.Session] = None,
-        timeout: float = 2.0,
-    ) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.session = session or requests.Session()
-        self.timeout = timeout
+    def __init__(self, http_client: IHttpClient, config: StreamingServiceConfig):
+        self._http_client = http_client  # ✅ Injected
+        self._config = config            # ✅ Injected
 
     # ---- low-level HTTP helper --------------------------------------------------
 
