@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+.venv/
+
+# Pytest
+.pytest_cache/
+
+# IDE
+.idea/
+
+# MacOS metadata
+.DS_Store
+_MACOSX/
+
+# Logs
+*.log
