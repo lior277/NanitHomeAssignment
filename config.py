@@ -1,15 +1,19 @@
-class Config:
-    APPIUM_SERVER = "http://127.0.0.1:4723"
+"""Configuration for streaming service."""
 
-    PLATFORM_NAME = "Android"
-    # config/config.py
-    UDID = "192.168.1.206:44421"
+from dataclasses import dataclass
 
-    DEVICE_NAME = "Pixel"  # label only
 
-    APP_PACKAGE = "com.google.android.apps.tasks"
-    APP_ACTIVITY = "com.google.android.apps.tasks.ui.TaskListsActivity"
-    AUTOMATION_NAME = "UiAutomator2"
+@dataclass
+class StreamingConfig:
+    """Streaming service configuration."""
 
-    IMPLICIT_WAIT = 10
-    EXPLICIT_WAIT = 20
+    base_url: str = "http://localhost:8082"
+    timeout: float = 5.0
+
+    @property
+    def health_url(self) -> str:
+        return f"{self.base_url}/health"
+
+    @property
+    def control_url(self) -> str:
+        return f"{self.base_url}/control/network/"

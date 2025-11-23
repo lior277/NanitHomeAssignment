@@ -1,56 +1,19 @@
-# infra/streaming_validator.py
-from __future__ import annotations
+"""Configuration for streaming service."""
 
-from typing import Any, Mapping, Literal, Optional
-
-import requests
-
-NetworkCondition = Literal["normal", "poor", "terrible"]
+from dataclasses import dataclass
 
 
-class StreamingValidator:
-    def __init__(self, http_client: IHttpClient, config: StreamingServiceConfig):
-        self._http_client = http_client  # ✅ Injected
-        self._config = config            # ✅ Injected
+@dataclass
+class StreamingConfig:
+    """Streaming service configuration."""
 
-    # ---- low-level HTTP helper --------------------------------------------------
+    base_url: str = "http://localhost:8082"
+    timeout: float = 5.0
 
-    def _get(self, path: str) -> requests.Response:
-        url = f"{self.base_url}{path}"
-        resp = self.session.get(url, timeout=self.timeout)
-        resp.raise_for_status()
-        return resp
+    @property
+    def health_url(self) -> str:
+        return f"{self.base_url}/health"
 
-    # ---- public API -------------------------------------------------------------
-
-    def get_health(self) -> Mapping[str, Any]:
-        """Return the JSON payload from /health."""
-        return self._get("/health").json()
-
-    def get_metrics(self) -> Mapping[str, Any]:
-        """Return the JSON payload from /metrics."""
-        return self._get("/metrics").json()
-
-    def get_latency_ms(self) -> float:
-        """
-        Streaming performance parameter: average latency in ms.
-
-        This comes from /metrics.performance.average_latency_ms.
-        """
-        metrics = self.get_metrics()
-        return float(metrics["performance"]["average_latency_ms"])
-
-    def set_network_condition(self, condition: NetworkCondition) -> None:
-        """Switch the backend to normal / poor / terrible."""
-        # server expects PUT /control/network/<condition>
-        url = f"{self.base_url}/control/network/{condition}"
-        resp = self.session.put(url, timeout=self.timeout)
-        resp.raise_for_status()
-
-    def get_manifest(self) -> str:
-        """Fetch the HLS manifest to ensure streaming is available."""
-        return self._get("/stream.m3u8").text
-
-    def get_segment(self, n: int) -> bytes:
-        """Fetch a specific TS segment."""
-        return self._get(f"/segment{n}.ts").content
+    @property
+    def control_url(self) -> str:
+        return f"{self.base_url}/control/network/"
