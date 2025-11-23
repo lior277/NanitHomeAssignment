@@ -1,6 +1,6 @@
 
 
-from infra.objects.data_classes.get_weather_response import WeatherResponse
+from infra.page_objects.data_classes.get_weather_response import WeatherResponse
 from infra.utils.api_access import ApiAccess
 
 
