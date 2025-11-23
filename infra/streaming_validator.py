@@ -6,7 +6,7 @@ from typing import Any, Mapping, Literal
 import logging
 
 from config.config import StreamingConfig
-from infra.page_objects.base_session import BaseSession
+from infra.base_session import BaseSession
 
 logger = logging.getLogger(__name__)
 
