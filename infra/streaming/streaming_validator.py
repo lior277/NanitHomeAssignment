@@ -1,35 +1,45 @@
+"""Validator for mock streaming service behavior.
+
+Provides :class:`StreamingValidator`, which is built on top of
+:class:`infra.base_session.BaseSession` and can:
+
+- query /health for latency and status metrics
+- switch network conditions
+- verify manifest and segment availability
+- support FAST_MODE for mocked runs without HTTP calls
+"""
+
 from __future__ import annotations
+
 from typing import Any, Mapping, Literal
 import logging
 import os
 import random
 
+import requests
+
 from config.config import StreamingConfig
 from infra.http.base_session import BaseSession
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 NetworkCondition = Literal["normal", "poor", "terrible"]
 
 
 class StreamingValidator(BaseSession):
-    """
-    Streaming validator with FAST_MODE support.
-
-    FAST_MODE=true  → no HTTP requests, return mocked numbers
-    FAST_MODE=false → real HTTP requests to mock_stream_server.py
-    """
+    """Client used to validate streaming backend behavior."""
 
     def __init__(self, config: StreamingConfig | None = None) -> None:
+        """Create a new streaming validator using the given configuration."""
         self.config = config or StreamingConfig()
         super().__init__(base_url=self.config.base_url, timeout=self.config.timeout)
 
-        # FAST MODE toggle
         self.fast_mode = os.getenv("FAST_MODE", "false").lower() == "true"
         if self.fast_mode:
-            logger.warning("⚡ FAST_MODE enabled — mocking streaming responses")
+            LOGGER.warning(
+                "FAST_MODE enabled — StreamingValidator using mock responses",
+            )
 
-        # Track mock state
         self._mock_condition: NetworkCondition = "normal"
 
     # ----------------------------
@@ -37,6 +47,7 @@ class StreamingValidator(BaseSession):
     # ----------------------------
 
     def get_health(self) -> Mapping[str, Any]:
+        """Fetch /health JSON or return mocked data in FAST_MODE."""
         if self.fast_mode:
             return {
                 "status": "healthy",
@@ -47,36 +58,43 @@ class StreamingValidator(BaseSession):
                     "terrible": 500,
                 }[self._mock_condition],
                 "latency_ms": {
-                    "normal": random.uniform(5, 25),
+                    "normal": random.uniform(5, 20),
                     "poor": random.uniform(80, 200),
                     "terrible": random.uniform(200, 400),
                 }[self._mock_condition],
-                "viewers": random.randint(5, 50),
+                "viewers": random.randint(10, 80),
             }
 
-        # Real network call
-        return self._get("/health").json()
+        data = self._get("/health").json()
+        LOGGER.debug("Health: %s", data)
+        return data
 
     def get_latency_ms(self) -> float:
+        """Return the numeric latency in milliseconds from /health."""
         health = self.get_health()
         latency = float(health["latency_ms"])
-        logger.info("latency_ms=%s", latency)
+        LOGGER.info("latency_ms=%s", latency)
         return latency
 
     # ----------------------------
-    # Network Behavior
+    # Network Control
     # ----------------------------
 
     def set_network_condition(self, condition: NetworkCondition) -> None:
+        """Switch network condition on the backend or in mock state."""
         if self.fast_mode:
-            logger.info(f"Mock network switching → {condition}")
+            LOGGER.info("Mock: switching network → %s", condition)
             self._mock_condition = condition
             return
 
-        logger.info("Switching network condition → %s", condition)
+        LOGGER.info("Switching network condition → %s", condition)
         try:
             self._post(f"/control/network/{condition}")
-        except Exception:
+        except requests.RequestException as first_exc:
+            LOGGER.warning(
+                "Path-style control failed, retrying with JSON body: %s",
+                first_exc,
+            )
             self._post("/control/network/", json={"condition": condition})
 
     # ----------------------------
@@ -84,17 +102,19 @@ class StreamingValidator(BaseSession):
     # ----------------------------
 
     def get_manifest(self) -> str:
+        """Return the manifest text."""
         if self.fast_mode:
             return "#EXTM3U\n#EXTINF:10,\nsegment1.ts\n"
 
-        return self._get("/stream.m3u8").text
+        text = self._get("/stream.m3u8").text
+        LOGGER.debug("Manifest length=%s", len(text))
+        return text
 
-    def get_segment(self, n: int) -> bytes:
+    def get_segment(self, index: int) -> bytes:
+        """Return the bytes for the given segment index."""
         if self.fast_mode:
             return b"FAKE_SEGMENT_DATA"
 
-        return self._get(f"/segment{n}.ts").content
-
-    def reset(self):
-        """Compatibility with BaseSession abstract reset()"""
-        self.set_network_condition("normal")
+        data = self._get(f"/segment{index}.ts").content
+        LOGGER.debug("Segment %s length=%s bytes", index, len(data))
+        return data

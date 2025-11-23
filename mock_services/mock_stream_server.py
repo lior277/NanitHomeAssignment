@@ -1,5 +1,5 @@
-"""
-Mock HLS streaming server with configurable network conditions.
+"""Mock HLS streaming server with configurable network conditions.
+
 Supports:
 - GET /health
 - GET /stream.m3u8
@@ -8,84 +8,70 @@ Supports:
 - POST /control/network/<condition>   (URL path-style)
 """
 
-import time
+from __future__ import annotations
+
 import random
-import os
-from flask import Flask, jsonify, request, Response
+import time
+
+from flask import Flask, jsonify, request, Response, make_response
 
 app = Flask(__name__)
 
-# --------------------------
-# TEST MODE (SPEED-UP)
-# --------------------------
-
-# Set TEST_MODE=true to skip network delays completely
-TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
-
-
-# --------------------------
-# Server State
-# --------------------------
-
-state = {
+STATE = {
     "network_condition": "normal",
     "viewers": 0,
-    "bitrate": 2500
+    "bitrate": 2500,
 }
 
 NETWORK_PROFILES = {
-    "normal":  {"bitrate": 2500, "latency": 0.05, "jitter": 0.01},
-    "poor":    {"bitrate": 1200, "latency": 0.20, "jitter": 0.10},
-    "terrible": {"bitrate": 500, "latency": 0.50, "jitter": 0.30},
+    "normal": {
+        "bitrate": 2500,
+        "latency": 0.05,
+        "jitter": 0.01,
+    },
+    "poor": {
+        "bitrate": 1200,
+        "latency": 0.20,
+        "jitter": 0.10,
+    },
+    "terrible": {
+        "bitrate": 500,
+        "latency": 0.50,
+        "jitter": 0.30,
+    },
 }
 
 
-# --------------------------
-# Helper Functions
-# --------------------------
-
-def apply_network_delay():
-    """
-    Apply realistic delay unless TEST_MODE=true
-    """
-    if TEST_MODE:
-        return  # 🔥 Skip delay completely for fast tests
-
-    profile = NETWORK_PROFILES[state["network_condition"]]
+def apply_network_delay() -> None:
+    """Apply realistic delay based on the current network profile."""
+    profile = NETWORK_PROFILES[STATE["network_condition"]]
     base = profile["latency"]
     jitter = random.uniform(-profile["jitter"], profile["jitter"])
     delay = max(0, base + jitter)
-
     time.sleep(delay)
 
 
-# --------------------------
-# API: Health
-# --------------------------
-
 @app.route("/health", methods=["GET"])
-def health():
+def health() -> Response:
+    """Health check endpoint returning basic streaming metrics."""
     apply_network_delay()
+    profile = NETWORK_PROFILES[STATE["network_condition"]]
 
-    profile = NETWORK_PROFILES[state["network_condition"]]
+    return jsonify(
+        {
+            "status": "healthy",
+            "bitrate": STATE["bitrate"],
+            "viewers": STATE["viewers"],
+            "latency_ms": profile["latency"] * 1000,
+            "network_condition": STATE["network_condition"],
+        },
+    )
 
-    return jsonify({
-        "status": "healthy",
-        "bitrate": state["bitrate"],
-        "viewers": state["viewers"],
-        "latency_ms": profile["latency"] * 1000,  # deterministic metric
-        "network_condition": state["network_condition"]
-    })
-
-
-# --------------------------
-# API: Manifest
-# --------------------------
 
 @app.route("/stream.m3u8", methods=["GET"])
-def stream_manifest():
+def stream_manifest() -> Response:
+    """Return a simple HLS manifest."""
     apply_network_delay()
-
     manifest = """#EXTM3U
 #EXT-X-VERSION:3
 #EXT-X-TARGETDURATION:10
@@ -105,67 +91,66 @@ segment5.ts
     return Response(manifest, mimetype="application/vnd.apple.mpegurl")
 
 
-# --------------------------
-# API: Segments
-# --------------------------
-
 @app.route("/segment<int:num>.ts", methods=["GET"])
-def segment(num):
-    """Return simulated video segment."""
+def segment(num: int) -> Response:
+    """Return a simulated TS segment by index (1-5)."""
     if num < 1 or num > 5:
-        return jsonify({"error": "Segment not found"}), 404
+        # Always return a Response object, not a (response, status_code) tuple
+        error_body = jsonify({"error": "Segment not found"})
+        return make_response(error_body, 404)
 
     apply_network_delay()
-
-    dummy_data = b"\x00" * (100 * 1024)  # ~100KB fake segment
+    dummy_data = b"\x00" * (100 * 1024)
     return Response(dummy_data, mimetype="video/MP2T")
 
 
-# --------------------------
-# API: Control
-# --------------------------
-
 @app.route("/control/network/<condition>", methods=["POST"])
-def control_network_path(condition):
-    """Set condition via /control/network/poor."""
+def control_network_path(condition: str) -> Response:
+    """Set network condition via path (/control/network/poor)."""
     if condition not in NETWORK_PROFILES:
-        return jsonify({
-            "status": "error",
-            "message": f"Invalid condition. Must be one of: {list(NETWORK_PROFILES.keys())}"
-        }), 400
+        resp = jsonify(
+            {
+                "status": "error",
+                "message": f"Invalid condition. Must be one of: {list(NETWORK_PROFILES.keys())}",
+            },
+        )
+        resp.status_code = 400
+        return resp
 
-    state["network_condition"] = condition
-    state["bitrate"] = NETWORK_PROFILES[condition]["bitrate"]
+    STATE["network_condition"] = condition
+    STATE["bitrate"] = NETWORK_PROFILES[condition]["bitrate"]
 
-    return jsonify({
-        "status": "success",
-        "network_condition": condition,
-        "bitrate": state["bitrate"]
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "network_condition": condition,
+            "bitrate": STATE["bitrate"],
+        },
+    )
 
 
 @app.route("/control/network/", methods=["POST"])
-def control_network_json():
-    """Set network via JSON: { "condition": "poor" }"""
+def control_network_json() -> Response:
+    """Set network condition via JSON payload: {'condition': 'poor'}."""
     data = request.get_json() or {}
     condition = data.get("condition")
 
+    # Validate here to avoid passing None to control_network_path
     if condition not in NETWORK_PROFILES:
-        return jsonify({
-            "status": "error",
-            "message": f"Invalid condition. Must be one of: {list(NETWORK_PROFILES.keys())}"
-        }), 400
+        resp = jsonify(
+            {
+                "status": "error",
+                "message": f"Invalid condition. Must be one of: {list(NETWORK_PROFILES.keys())}",
+            },
+        )
+        resp.status_code = 400
+        return resp
 
     return control_network_path(condition)
 
 
-# --------------------------
-# Startup
-# --------------------------
-
 if __name__ == "__main__":
     print("Mock streaming server starting on http://localhost:8082\n")
-    print("TEST_MODE =", TEST_MODE)  # 🔥 Shows speed mode
     print("Endpoints:")
     print("  GET  /health")
     print("  GET  /stream.m3u8")

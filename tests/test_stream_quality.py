@@ -1,36 +1,28 @@
-# tests/test_stream_quality.py
-"""
-Stage 2 – Streaming validation on API layer.
+"""Tests for streaming quality behavior under different conditions."""
 
-Precondition (local):
-    python mock_services/mock_stream_server.py
-"""
+from __future__ import annotations
 
 import pytest
 
-from config.config import StreamingConfig
 from infra.streaming.streaming_validator import StreamingValidator
 
 
 @pytest.mark.streaming
-def test_stream_latency_degrades_from_normal_to_poor(streaming_validator: StreamingValidator) -> None:
-    v = streaming_validator
+def test_stream_latency_degrades_from_normal_to_poor(
+    streaming_validator: StreamingValidator,
+) -> None:
+    """Latency should increase when network degrades from normal to poor."""
+    validator = streaming_validator
 
-    # Baseline
-    v.set_network_condition("normal")
-    normal_latency = v.get_latency_ms()
-    manifest_normal = v.get_manifest()
-    assert "#EXTM3U" in manifest_normal
+    validator.set_network_condition("normal")
+    normal_latency = validator.get_latency_ms()
 
-    # Poor network
-    v.set_network_condition("poor")
-    poor_latency = v.get_latency_ms()
-    manifest_poor = v.get_manifest()
-    assert "#EXTM3U" in manifest_poor
+    validator.set_network_condition("poor")
+    poor_latency = validator.get_latency_ms()
 
     assert poor_latency > normal_latency, (
-        f"Expected higher latency under 'poor' network, "
-        f"got normal={normal_latency}, poor={poor_latency}"
+        "Expected latency under 'poor' network to be higher than 'normal'. "
+        f"Got normal={normal_latency}, poor={poor_latency}"
     )
 
 
@@ -40,9 +32,10 @@ def test_manifest_available_under_all_conditions(
     streaming_validator: StreamingValidator,
     condition: str,
 ) -> None:
-    v = streaming_validator
-    v.set_network_condition(condition)
-    manifest = v.get_manifest()
+    """Manifest should be available for all declared network conditions."""
+    validator = streaming_validator
+    validator.set_network_condition(condition)
+    manifest = validator.get_manifest()
     assert "#EXTM3U" in manifest
 
 
@@ -50,20 +43,27 @@ def test_manifest_available_under_all_conditions(
 def test_segments_reachable_under_normal_conditions(
     streaming_validator: StreamingValidator,
 ) -> None:
-    v = streaming_validator
-    v.set_network_condition("normal")
+    """Segments 1-5 should be reachable under normal network conditions."""
+    validator = streaming_validator
+    validator.set_network_condition("normal")
 
-    for i in range(1, 6):
-        data = v.get_segment(i)
-        assert len(data) > 0, f"Segment {i} should not be empty"
+    for index in range(1, 6):
+        data = validator.get_segment(index)
+        assert data, f"Segment {index} should not be empty"
 
 
 @pytest.mark.streaming
 def test_invalid_segment_returns_error_code(
-    streaming_config: StreamingConfig,
+    streaming_validator: StreamingValidator,
 ) -> None:
-    """Example negative test – not using validator, just raw HTTP if desired."""
-    import requests
+    """
+    Invalid segment indexes should trigger an error response.
 
-    resp = requests.get(f"{streaming_config.base_url.rstrip('/')}/segment0.ts", timeout=streaming_config.timeout)
-    assert resp.status_code == 404
+    Current behavior:
+    - The server returns HTTP 404.
+    - The validator raises an exception due to BaseSession.raise_for_status().
+    """
+    streaming_validator.set_network_condition("normal")
+
+    with pytest.raises(Exception):
+        streaming_validator.get_segment(0)  # out-of-range
