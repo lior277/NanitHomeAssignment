@@ -5,14 +5,13 @@ This server simulates an HLS streaming service with configurable network conditi
 to test automation and monitoring systems.
 """
 
-import time
-import random
 import logging
-from typing import Dict, Optional, Tuple
-from datetime import datetime
+import random
+import time
 from threading import Lock
+from typing import Optional, Tuple
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify
 from flask_cors import CORS
 
 # Configure logging

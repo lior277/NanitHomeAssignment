@@ -1,9 +1,10 @@
 """
 Pytest configuration and fixtures
 """
-import pytest
-from utils.test_suit_base import TestSuitBase
 import logging
+import pytest
+
+from infra.utils.test_suit_base import TestSuitBase
 
 logging.basicConfig(
     level=logging.INFO,

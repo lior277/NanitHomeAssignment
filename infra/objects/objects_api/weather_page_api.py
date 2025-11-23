@@ -1,8 +1,7 @@
 
-from automation_framework.config.manager import ConfigManager
-from automation_framework.utilities.api_access import ApiAccess
-from automation_framework.utilities.db_helpers import DatabaseHelper
-from objects.data_classes.get_weather_response import WeatherResponse
+
+from infra.objects.data_classes.get_weather_response import WeatherResponse
+from infra.utils.api_access import ApiAccess
 
 
 class WeatherPageApi:
@@ -11,7 +10,6 @@ class WeatherPageApi:
     ) -> None:
         self.api_access = ApiAccess()
         self.config_manager = ConfigManager()
-        self.database_helper = DatabaseHelper()
 
         self.BASE_URL = self.config_manager.get_api_base_url()
         self.API_KEY = self.config_manager.get_api_key()

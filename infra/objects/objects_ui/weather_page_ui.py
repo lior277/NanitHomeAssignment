@@ -3,7 +3,7 @@ from selenium.webdriver.chrome import webdriver
 from selenium.webdriver.common.by import By
 
 from automation_framework.utilities.web_driver_extension.web_driver_extension import DriverEX
-from objects.data_classes.get_weather_response import WeatherResponse
+from infra.objects.data_classes.get_weather_response import WeatherResponse
 
 
 class WeatherPageUi:
