@@ -1,11 +1,11 @@
 """HTTP client interface and implementation."""
-
+import logging
 from abc import ABC, abstractmethod
+from logging import Logger
 from typing import Dict, Any, Optional
 import requests
-import logging
 
-logger = logging.getLogger(__name__)
+logger: Logger = logging.getLogger(__name__)
 
 
 class IHttpClient(ABC):
@@ -14,13 +14,11 @@ class IHttpClient(ABC):
     @abstractmethod
     def get(self, url: str, timeout: Optional[float] = None) -> Dict[str, Any]:
         """Execute GET request."""
-        pass
 
     @abstractmethod
     def post(self, url: str, json_data: Optional[Dict[str, Any]] = None,
              timeout: Optional[float] = None) -> Dict[str, Any]:
         """Execute POST request."""
-        pass
 
 
 class HttpClient(IHttpClient):
