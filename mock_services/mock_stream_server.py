@@ -10,9 +10,18 @@ Supports:
 
 import time
 import random
+import os
 from flask import Flask, jsonify, request, Response
 
 app = Flask(__name__)
+
+# --------------------------
+# TEST MODE (SPEED-UP)
+# --------------------------
+
+# Set TEST_MODE=true to skip network delays completely
+TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
+
 
 # --------------------------
 # Server State
@@ -25,21 +34,9 @@ state = {
 }
 
 NETWORK_PROFILES = {
-    "normal": {
-        "bitrate": 2500,
-        "latency": 0.05,
-        "jitter": 0.01
-    },
-    "poor": {
-        "bitrate": 1200,
-        "latency": 0.20,
-        "jitter": 0.10
-    },
-    "terrible": {
-        "bitrate": 500,
-        "latency": 0.50,
-        "jitter": 0.30
-    }
+    "normal":  {"bitrate": 2500, "latency": 0.05, "jitter": 0.01},
+    "poor":    {"bitrate": 1200, "latency": 0.20, "jitter": 0.10},
+    "terrible": {"bitrate": 500, "latency": 0.50, "jitter": 0.30},
 }
 
 
@@ -48,16 +45,22 @@ NETWORK_PROFILES = {
 # --------------------------
 
 def apply_network_delay():
-    """Apply realistic delay based on current network profile."""
+    """
+    Apply realistic delay unless TEST_MODE=true
+    """
+    if TEST_MODE:
+        return  # 🔥 Skip delay completely for fast tests
+
     profile = NETWORK_PROFILES[state["network_condition"]]
     base = profile["latency"]
     jitter = random.uniform(-profile["jitter"], profile["jitter"])
     delay = max(0, base + jitter)
+
     time.sleep(delay)
 
 
 # --------------------------
-# Health Endpoint
+# API: Health
 # --------------------------
 
 @app.route("/health", methods=["GET"])
@@ -70,13 +73,13 @@ def health():
         "status": "healthy",
         "bitrate": state["bitrate"],
         "viewers": state["viewers"],
-        "latency_ms": profile["latency"] * 1000,  # NEW: deterministic metric
+        "latency_ms": profile["latency"] * 1000,  # deterministic metric
         "network_condition": state["network_condition"]
     })
 
 
 # --------------------------
-# HLS Manifest
+# API: Manifest
 # --------------------------
 
 @app.route("/stream.m3u8", methods=["GET"])
@@ -103,7 +106,7 @@ segment5.ts
 
 
 # --------------------------
-# Video Segments
+# API: Segments
 # --------------------------
 
 @app.route("/segment<int:num>.ts", methods=["GET"])
@@ -119,12 +122,12 @@ def segment(num):
 
 
 # --------------------------
-# Control Endpoints
+# API: Control
 # --------------------------
 
 @app.route("/control/network/<condition>", methods=["POST"])
 def control_network_path(condition):
-    """Set condition via path-style endpoint (/control/network/poor)."""
+    """Set condition via /control/network/poor."""
     if condition not in NETWORK_PROFILES:
         return jsonify({
             "status": "error",
@@ -143,7 +146,7 @@ def control_network_path(condition):
 
 @app.route("/control/network/", methods=["POST"])
 def control_network_json():
-    """Set network conditions via JSON body ({"condition":"poor"})."""
+    """Set network via JSON: { "condition": "poor" }"""
     data = request.get_json() or {}
     condition = data.get("condition")
 
@@ -153,7 +156,6 @@ def control_network_json():
             "message": f"Invalid condition. Must be one of: {list(NETWORK_PROFILES.keys())}"
         }), 400
 
-    # Delegate to path-based logic for consistency
     return control_network_path(condition)
 
 
@@ -163,12 +165,13 @@ def control_network_json():
 
 if __name__ == "__main__":
     print("Mock streaming server starting on http://localhost:8082\n")
+    print("TEST_MODE =", TEST_MODE)  # 🔥 Shows speed mode
     print("Endpoints:")
     print("  GET  /health")
     print("  GET  /stream.m3u8")
     print("  GET  /segment{1-5}.ts")
-    print("  POST /control/network/<condition>   # path-based (assignment)")
-    print("  POST /control/network/              # body-based (tests)")
+    print("  POST /control/network/<condition>")
+    print("  POST /control/network/")
     print("\nNetwork conditions: normal, poor, terrible\n")
 
     app.run(host="0.0.0.0", port=8082, debug=False)

@@ -9,7 +9,7 @@ Precondition (local):
 import pytest
 
 from config.config import StreamingConfig
-from infra.streaming_validator import StreamingValidator
+from infra.streaming.streaming_validator import StreamingValidator
 
 
 @pytest.mark.streaming

@@ -3,7 +3,7 @@
 import logging
 from time import sleep
 from infra.page_objects.http_client import HttpClient
-from infra.streaming_validator import StreamingConfig
+from infra.streaming.streaming_validator import StreamingConfig
 from config import StreamingConfig
 
 # Setup logging
