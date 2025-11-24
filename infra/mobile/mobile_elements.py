@@ -1,16 +1,6 @@
-"""Cross-platform mobile element locator mapping.
+# infra/mobile/mobile_elements.py
 
-This module defines a central mapping of logical element names to platform
-specific identifiers (iOS / Android). In a real project, these would map
-to accessibility IDs or resource IDs used by Appium.
-"""
-
-from __future__ import annotations
-
-from typing import Dict
-
-
-MOBILE_ELEMENTS: Dict[str, Dict[str, str]] = {
+MOBILE_ELEMENTS = {
     "welcome_login_button": {
         "ios": "login_button_ios",
         "android": "login_button_android",
@@ -26,5 +16,13 @@ MOBILE_ELEMENTS: Dict[str, Dict[str, str]] = {
     "submit_login": {
         "ios": "login_button_ios",
         "android": "login_button_android",
+    },
+    "start_stream": {
+        "ios": "start_stream_ios",
+        "android": "start_stream_android",
+    },
+    "stop_stream": {
+        "ios": "stop_stream_ios",
+        "android": "stop_stream_android",
     },
 }

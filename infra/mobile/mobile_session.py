@@ -1,78 +1,117 @@
-"""Mocked mobile driver session used for the Nanit assignment.
-
-This class simulates a minimal Appium-like session without real devices.
-It is intentionally simple and state-based for test design purposes.
-"""
-
 from __future__ import annotations
-
 import logging
-import os
-from dataclasses import dataclass
+
+from infra.mobile.elements_resolver import ElementResolver
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class MobileSession:
-    """Mock session that simulates a mobile app driver."""
+    """Mock mobile session implementing welcome → login → live_stream flow."""
 
-    platform: str  # "ios" or "android"
-    app_launched: bool = False
-    logged_in: bool = False
-    current_screen: str = "welcome"
-    fast_mode: bool = False
+    def __init__(self, platform: str) -> None:
+        self.platform = platform
+        self.app_launched = False
+        self.logged_in = False
+        self.live_stream_active = False
+        self.current_screen = "welcome"
 
-    def __post_init__(self) -> None:
-        """Initialize FAST_MODE from environment."""
-        self.fast_mode = os.getenv("FAST_MODE", "false").lower() == "true"
-        if self.fast_mode:
-            logger.warning(
-                "FAST_MODE enabled for MobileSession on platform %s",
-                self.platform,
-            )
+        # Resolve logical names → platform-specific IDs
+        self.resolver = ElementResolver(platform)
 
     def launch_app(self) -> None:
-        """Simulate launching the Nanit app."""
+        logger.info("Launching app on %s", self.platform)
         self.app_launched = True
         self.current_screen = "welcome"
-        logger.info("App launched on platform %s", self.platform)
 
-    def tap(self, element_id: str) -> None:
-        """Simulate tapping an element by id."""
-        logger.info(
-            "Tap on element %s in screen %s",
-            element_id,
-            self.current_screen,
-        )
-
-        if self.fast_mode:
-            logger.warning(
-                "FAST_MODE: tap() shortcut enabled on screen %s",
-                self.current_screen,
-            )
-
-        if self.current_screen == "welcome" and "login_button" in element_id:
-            self.current_screen = "login"
-            logger.debug("Navigated to login screen")
-        elif self.current_screen == "login" and "login_button" in element_id:
-            self.logged_in = True
-            self.current_screen = "live_stream"
-            logger.debug("Login simulated, navigated to live_stream screen")
-
-    def enter_text(self, element_id: str, text: str) -> None:
-        """Simulate entering text into an input."""
-        logger.debug(
-            "Enter text into %s on screen %s",
-            element_id,
-            self.current_screen,
-        )
-        # No-op in mock session
+    def close(self) -> None:
+        logger.info("Closing session")
+        self.app_launched = False
+        self.logged_in = False
+        self.live_stream_active = False
+        self.current_screen = "welcome"
 
     def get_current_screen(self) -> str:
-        """Return logical current screen."""
         return self.current_screen
 
     def is_logged_in(self) -> bool:
-        """Return whether the user is considered logged in."""
         return self.logged_in
+
+    def enter_text(self, logical_name: str, value: str) -> None:
+        resolved = self.resolver.locator(logical_name)
+        logger.info("Enter text into %s = %s", resolved, value)
+
+    def tap(self, logical_name: str) -> None:
+        """Resolve element + route to correct handler based on active screen."""
+        resolved = self.resolver.locator(logical_name)
+        logger.info("Tap: %s (resolved=%s)", logical_name, resolved)
+
+        handlers = {
+            "welcome": self._handle_welcome,
+            "login": self._handle_login,
+            "live_stream": self._handle_stream,
+        }
+
+        handler = handlers.get(self.current_screen)
+        if handler is not None:
+            return handler(logical_name)
+
+        logger.warning(
+            "No handler for tap '%s' on screen '%s'",
+            logical_name,
+            self.current_screen,
+        )
+        return None
+
+    def _handle_welcome(self, name: str) -> None:
+        if name == "welcome_login_button":
+            self.go_to_login()
+            return
+
+        logger.warning("Unhandled welcome action: %s", name)
+
+    def _handle_login(self, name: str) -> None:
+        if name == "submit_login":
+            self._submit_login()
+            return
+
+        logger.warning("Unhandled login action: %s", name)
+
+    def _handle_stream(self, name: str) -> None:
+        if name == "start_stream":
+            self.start_live_stream()
+            return
+
+        if name == "stop_stream":
+            self.stop_live_stream()
+            return
+
+        logger.warning("Unhandled stream action: %s", name)
+
+    def go_to_login(self) -> None:
+        if not self.app_launched:
+            raise RuntimeError("Cannot navigate: app not launched")
+        logger.info("→ welcome → login")
+        self.current_screen = "login"
+
+    def enter_dashboard(self) -> None:
+        if not self.logged_in:
+            raise RuntimeError("Cannot enter dashboard: not logged in")
+        logger.info("→ login → live_stream")
+        self.current_screen = "live_stream"
+
+    def _submit_login(self) -> None:
+        logger.info("Submitting login")
+        self.logged_in = True
+        self.enter_dashboard()
+
+    def start_live_stream(self) -> None:
+        if not self.logged_in:
+            raise RuntimeError("Cannot start stream: user not logged in")
+        logger.info("Live stream started")
+        self.live_stream_active = True
+        self.current_screen = "live_stream"
+
+    def stop_live_stream(self) -> None:
+        logger.info("Live stream stopped")
+        self.live_stream_active = False
