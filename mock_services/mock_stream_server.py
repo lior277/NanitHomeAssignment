@@ -1,12 +1,3 @@
-"""Mock HLS streaming server with configurable network conditions.
-
-Supports:
-- GET /health
-- GET /stream.m3u8
-- GET /segment{1-5}.ts
-- POST /control/network/              (JSON body)
-- POST /control/network/<condition>   (URL path-style)
-"""
 
 from __future__ import annotations
 
@@ -95,7 +86,6 @@ segment5.ts
 def segment(num: int) -> Response:
     """Return a simulated TS segment by index (1-5)."""
     if num < 1 or num > 5:
-        # Always return a Response object, not a (response, status_code) tuple
         error_body = jsonify({"error": "Segment not found"})
         return make_response(error_body, 404)
 
@@ -135,7 +125,6 @@ def control_network_json() -> Response:
     data = request.get_json() or {}
     condition = data.get("condition")
 
-    # Validate here to avoid passing None to control_network_path
     if condition not in NETWORK_PROFILES:
         resp = jsonify(
             {
