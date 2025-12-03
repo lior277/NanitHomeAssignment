@@ -41,8 +41,6 @@ def test_segments_reachable_under_normal_conditions(
 
 @pytest.mark.streaming
 def test_invalid_segment_returns_error(streaming_validator: StreamingValidator) -> None:
-    if streaming_validator.fast_mode:
-        pytest.skip("Server error behavior not validated under FAST_MODE")
 
     streaming_validator.set_network_condition("normal")
 
